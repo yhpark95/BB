@@ -1,0 +1,42 @@
+name: simple_bible
+description: 광고 없고 로그인 없는 오프라인 성경
+publish_to: 'none'
+
+version: 1.13.0+30
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # Database
+  sqflite: ^2.3.0
+  path: ^1.8.3
+
+  # State Management & Storage
+  provider: ^6.1.1
+  shared_preferences: ^2.2.2
+
+  # UI
+  cupertino_icons: ^1.0.6
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+
+flutter:
+  uses-material-design: true
+
+  assets:
+    # nkjv.json is not referenced by any code and no NKJV row exists in the
+    # translations table; bundling it cost ~7MB of APK for nothing.
+    - assets/bible.db
+
+  # Fonts (can add KoPub World Batang later)
+  # fonts:
+  #   - family: KoPubWorld
+  #     fonts:
+  #       - asset: fonts/KoPubWorldBatang.ttf

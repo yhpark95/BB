@@ -1,0 +1,14 @@
+# Manual backup copy of the app; history now lives in git
+simple_bible_snapshot_*/
+
+# IDE
+.idea/
+
+# Build output and local machine config
+**/build/
+**/.dart_tool/
+**/local.properties
+**/key.properties
+*.jks
+*.keystore
+*.backup
