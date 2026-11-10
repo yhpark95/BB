@@ -184,6 +184,22 @@ class _SearchScreenState extends State<SearchScreen>
     }
   }
 
+  /// The language the keywords look like they are written in, when that is not
+  /// the language being searched: Hangul while searching English or French,
+  /// Latin letters while searching Korean. Null when there is no mismatch.
+  int? get _suggestedLanguage {
+    if (_keywords.isEmpty) return null;
+    if (_keywords.every(DatabaseService.isHangulOnly)) {
+      return _searchTranslationId == 2 ? null : 2;
+    }
+    final latin = RegExp(r'^[A-Za-zÀ-ÿ\s\-]+$');
+    if (_keywords.every(latin.hasMatch) && _searchTranslationId == 2) {
+      // English is the likelier intent for a bare Latin word.
+      return 1;
+    }
+    return null;
+  }
+
   void _setSearchTranslation(int id) {
     if (_searchTranslationId == id) return;
     setState(() => _searchTranslationId = id);
@@ -359,8 +375,11 @@ class _SearchScreenState extends State<SearchScreen>
     if (lastEnd < text.length) {
       spans.add(TextSpan(text: text.substring(lastEnd)));
     }
-    return RichText(
-      text: TextSpan(style: baseStyle, children: spans),
+    // Text.rich, not RichText: RichText ignores the inherited text style, so
+    // the verse had no colour of its own and came out near-white on the light
+    // card — the matched words were bold and everything else was unreadable.
+    return Text.rich(
+      TextSpan(style: baseStyle, children: spans),
       maxLines: 3,
       overflow: TextOverflow.ellipsis,
     );
@@ -433,6 +452,9 @@ class _SearchScreenState extends State<SearchScreen>
         children: [
           if (_keywords.isNotEmpty)
             Container(
+              // Full width: left to shrink-wrap, the bar was a grey box the
+              // size of one chip, floating in the middle of the screen.
+              width: double.infinity,
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
@@ -565,6 +587,21 @@ class _SearchScreenState extends State<SearchScreen>
                   fontSize: 15,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
                 )),
+            if (_suggestedLanguage != null) ...[
+              const SizedBox(height: 20),
+              // The usual reason a word is not found is that it is in a
+              // different language than the one being searched. Say so and
+              // offer the fix, instead of leaving the language chip to be
+              // noticed.
+              FilledButton.tonalIcon(
+                icon: const Icon(Icons.translate),
+                label: Text(
+                  '${kTranslationShortNames[_suggestedLanguage]}로 찾아보기',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                onPressed: () => _setSearchTranslation(_suggestedLanguage!),
+              ),
+            ],
           ],
         ),
       );

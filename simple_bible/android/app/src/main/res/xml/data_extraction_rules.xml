@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ equivalent of backup_rules.xml; see the reason there. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="database" path="bible.db" />
+        <exclude domain="database" path="bible.db-journal" />
+        <exclude domain="database" path="bible.db-wal" />
+        <exclude domain="database" path="bible.db-shm" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="database" path="bible.db" />
+        <exclude domain="database" path="bible.db-journal" />
+        <exclude domain="database" path="bible.db-wal" />
+        <exclude domain="database" path="bible.db-shm" />
+    </device-transfer>
+</data-extraction-rules>

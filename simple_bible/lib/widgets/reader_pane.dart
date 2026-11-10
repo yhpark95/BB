@@ -699,18 +699,29 @@ class ReaderPaneState extends State<ReaderPane> with VerseSelectionMixin {
       // to act on "DatabaseException(no such table: verses) sql=..." — it just
       // reads as the phone being broken.
       debugPrint('[RP] showing load failure: $_error');
-      return const Center(
+      return Center(
         child: Padding(
-          padding: EdgeInsets.all(16),
+          padding: const EdgeInsets.all(16),
           child: Column(
             mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              Icon(Icons.error_outline, size: 56, color: Colors.red),
-              SizedBox(height: 16),
-              Text('성경을 불러오지 못했어요',
+              const Icon(Icons.error_outline, size: 56, color: Colors.red),
+              const SizedBox(height: 16),
+              const Text('성경을 불러오지 못했어요',
                   style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              SizedBox(height: 8),
-              Text('앱을 다시 켜 보세요', style: TextStyle(fontSize: 15)),
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                icon: const Icon(Icons.refresh),
+                label: const Text('다시 시도', style: TextStyle(fontSize: 16)),
+                onPressed: () {
+                  setState(() {
+                    _error = null;
+                    _loading = true;
+                  });
+                  _beginLoading();
+                  _loadData();
+                },
+              ),
             ],
           ),
         ),

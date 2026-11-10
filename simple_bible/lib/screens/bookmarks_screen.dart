@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../utils/bookmark_transfer.dart';
 import '../services/database_service.dart';
 import '../services/settings_service.dart';
 import '../models/verse.dart';
@@ -68,6 +70,45 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     return '$name ${verse.chapter}장 ${verse.verse}절';
   }
 
+  Future<void> _export() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final tid = Provider.of<SettingsService>(context, listen: false)
+        .primaryTranslationId;
+    final verses = await db.getBookmarks(translationId: tid);
+    if (verses.isEmpty) {
+      messenger.showSnackBar(
+          const SnackBar(content: Text('복사할 북마크가 없어요')));
+      return;
+    }
+    final text = formatBookmarkExport([
+      for (final v in verses)
+        (uid: v.verseUid, reference: _getVerseReference(v)),
+    ]);
+    await Clipboard.setData(ClipboardData(text: text));
+    messenger.showSnackBar(SnackBar(
+        content: Text('북마크 ${verses.length}개를 복사했어요. '
+            '메모나 카톡에 붙여 넣어 보관하세요')));
+  }
+
+  Future<void> _import() async {
+    final messenger = ScaffoldMessenger.of(context);
+    final db = Provider.of<DatabaseService>(context, listen: false);
+    final data = await Clipboard.getData(Clipboard.kTextPlain);
+    final uids = parseBookmarkImport(data?.text ?? '');
+    if (uids.isEmpty) {
+      messenger.showSnackBar(const SnackBar(
+          content: Text('붙여 넣을 북마크가 없어요. 먼저 복사해 두세요')));
+      return;
+    }
+    final added = await db.importBookmarks(uids);
+    _reload();
+    messenger.showSnackBar(SnackBar(
+        content: Text(added == 0
+            ? '새로 추가된 북마크가 없어요 (이미 모두 있어요)'
+            : '북마크 $added개를 가져왔어요')));
+  }
+
   /// Deleting is one tap away, so it must be undoable.
   Future<void> _removeBookmark(Verse verse) async {
     final dbService = Provider.of<DatabaseService>(context, listen: false);
@@ -103,6 +144,16 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
         title: const Text('북마크',
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         centerTitle: true,
+        actions: [
+          PopupMenuButton<String>(
+            tooltip: '북마크 옮기기',
+            onSelected: (v) => v == 'export' ? _export() : _import(),
+            itemBuilder: (_) => const [
+              PopupMenuItem(value: 'export', child: Text('북마크 복사하기')),
+              PopupMenuItem(value: 'import', child: Text('복사한 북마크 가져오기')),
+            ],
+          ),
+        ],
       ),
       body: FutureBuilder<List<Verse>>(
         future: _bookmarksFuture,
@@ -116,17 +167,22 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             // DatabaseException with its SQL in it means nothing to anyone
             // using this app, and looks like the phone is broken.
             debugPrint('[Bookmarks] load failed: ${snapshot.error}');
-            return const Center(
+            return Center(
               child: Column(
                 mainAxisAlignment: MainAxisAlignment.center,
                 children: [
-                  Icon(Icons.error_outline, size: 56, color: Colors.red),
-                  SizedBox(height: 16),
-                  Text('북마크를 불러오지 못했어요',
+                  const Icon(Icons.error_outline, size: 56, color: Colors.red),
+                  const SizedBox(height: 16),
+                  const Text('북마크를 불러오지 못했어요',
                       style:
                           TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  SizedBox(height: 8),
-                  Text('앱을 다시 켜 보세요', style: TextStyle(fontSize: 15)),
+                  const SizedBox(height: 16),
+                  FilledButton.icon(
+                    icon: const Icon(Icons.refresh),
+                    label: const Text('다시 시도',
+                        style: TextStyle(fontSize: 16)),
+                    onPressed: _reload,
+                  ),
                 ],
               ),
             );

@@ -618,6 +618,8 @@ class _ChapterPageState extends State<_ChapterPage> {
             widget.onVerseTap(verse.verse);
           },
           child: RichText(
+            textScaler:
+                MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.5),
             text: TextSpan(
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                     height: settings.lineHeight,

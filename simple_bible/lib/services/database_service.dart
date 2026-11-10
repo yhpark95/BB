@@ -511,6 +511,46 @@ class DatabaseService {
     }
   }
 
+  /// Every bookmarked verse uid, newest first. For export.
+  Future<List<int>> allBookmarkUids() async {
+    final userDb = await userDatabase;
+    final rows = await userDb.query('bookmarks',
+        columns: ['verse_uid'], orderBy: 'created_at DESC');
+    return [for (final r in rows) r['verse_uid'] as int];
+  }
+
+  /// Adds bookmarks from an import and returns how many were new.
+  ///
+  /// Uids that are not a verse in the Bible database are dropped, so pasted
+  /// text can never plant a bookmark that points nowhere.
+  Future<int> importBookmarks(Iterable<int> uids) async {
+    final wanted = uids.toSet().toList();
+    if (wanted.isEmpty) return 0;
+    final db = await database;
+    final placeholders = wanted.map((_) => '?').join(', ');
+    final rows = await db.rawQuery(
+      'SELECT DISTINCT verse_uid FROM verses WHERE verse_uid IN ($placeholders)',
+      wanted,
+    );
+    final valid = [for (final r in rows) r['verse_uid'] as int];
+    if (valid.isEmpty) return 0;
+
+    final userDb = await userDatabase;
+    final before = await allBookmarkUids();
+    final now = DateTime.now().toUtc().toIso8601String();
+    final batch = userDb.batch();
+    for (final uid in valid) {
+      batch.insert(
+        'bookmarks',
+        {'verse_uid': uid, 'created_at': now},
+        conflictAlgorithm: ConflictAlgorithm.ignore,
+      );
+    }
+    await batch.commit(noResult: true);
+    final after = await allBookmarkUids();
+    return after.length - before.length;
+  }
+
   /// Remove bookmark
   Future<void> removeBookmark(int verseUid) async {
     final userDb = await userDatabase;

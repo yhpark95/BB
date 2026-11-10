@@ -1,0 +1,11 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android Auto Backup gives up on an app whose backup exceeds 25MB, and the
+     bundled Bible database alone is larger than that. It is rebuilt from the
+     app's assets on first launch, so it is left out; what is worth backing up
+     is the reader's own data — bookmarks and settings — which is tiny. -->
+<full-backup-content>
+    <exclude domain="database" path="bible.db" />
+    <exclude domain="database" path="bible.db-journal" />
+    <exclude domain="database" path="bible.db-wal" />
+    <exclude domain="database" path="bible.db-shm" />
+</full-backup-content>
