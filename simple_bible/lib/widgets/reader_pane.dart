@@ -461,9 +461,12 @@ class ReaderPaneState extends State<ReaderPane> with VerseSelectionMixin {
           : (isPrimary ? _verseKey(verse.verse) : null),
       highlighted: isArrival || isSelected(verse.verse),
       bookmarked: isBookmarkedVerse(verse),
-      // Search terms are marked only on the verse arrived at, in one column.
+      // Search terms are marked on the verse arrived at, in both columns: the
+      // word was found in whichever translation was searched, and that need
+      // not be the primary one. A Hangul term simply matches nothing in an
+      // English column.
       bodySpans: highlightSpans(joinKoreanWords(verse.text),
-          holdsScrollAnchor ? widget.searchKeywords : null),
+          isArrival ? widget.searchKeywords : null),
       separated: separated,
       // Both retire the arrival cue first, so a verse reached from a bookmark
       // or a search result stops looking selected the moment it is touched.

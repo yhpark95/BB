@@ -638,7 +638,7 @@ class _ChapterPageState extends State<_ChapterPage> {
       highlighted: widget.selectedNums.contains(verse.verse) || isArrival,
       bookmarked: widget.bookmarkedUids.contains(verse.verseUid),
       bodySpans: highlightSpans(joinKoreanWords(verse.text),
-          isSearchVerse ? widget.searchKeywords : null),
+          isArrival ? widget.searchKeywords : null),
       separated: separated,
       onLongPress: () {
         _clearArrival();
