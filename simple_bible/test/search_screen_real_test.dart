@@ -119,6 +119,38 @@ void main() {
     expect(find.textContaining('로 찾아보기'), findsNothing);
   });
 
+  testWidgets('the field hint changes once a word has moved into a chip',
+      (tester) async {
+    await settings.setSingleTranslation(2);
+    await pumpSearch(tester);
+    expect(find.text('찾을 낱말을 넣으세요'), findsOneWidget);
+    await search(tester, '사랑');
+    expect(find.text('낱말을 더 넣어 좁혀 보세요'), findsOneWidget);
+    expect(find.text('찾을 낱말을 넣으세요'), findsNothing);
+  });
+
+  testWidgets('two words explain how they are joined, and the pill switches it',
+      (tester) async {
+    await settings.setSingleTranslation(2);
+    await pumpSearch(tester);
+    await search(tester, '사랑');
+    expect(find.textContaining('그리고'), findsNothing); // one word: no pill
+    await search(tester, '믿음');
+    expect(find.text('그리고'), findsOneWidget);
+    expect(find.textContaining('둘 다 있는 구절만 찾아요'), findsOneWidget);
+    final both = find.textContaining('개 찾았어요');
+    final bothText = tester.widget<Text>(both).data!;
+
+    await tester.tap(find.text('그리고'));
+    await tester.pump();
+    await settle(tester);
+    expect(find.text('또는'), findsOneWidget);
+    expect(find.textContaining('하나라도 있는 구절을 찾아요'), findsOneWidget);
+    // OR returns more verses than AND.
+    int n(String s) => int.parse(RegExp(r'\d+').firstMatch(s)!.group(0)!);
+    expect(n(tester.widget<Text>(both).data!), greaterThan(n(bothText)));
+  });
+
   testWidgets('removing the only keyword returns to the start screen',
       (tester) async {
     await settings.setSingleTranslation(2);

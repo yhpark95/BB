@@ -657,6 +657,7 @@ PreferredSizeWidget searchAppBar(
   required VoidCallback onClear,
   required ValueChanged<String> onChanged,
   bool autofocus = true,
+  String hintText = '찾을 낱말을 넣으세요',
 }) {
   final scheme = Theme.of(context).colorScheme;
   final scaler = MediaQuery.textScalerOf(context);
@@ -727,7 +728,7 @@ PreferredSizeWidget searchAppBar(
           textInputAction: TextInputAction.search,
           style: Theme.of(context).textTheme.titleMedium,
           decoration: InputDecoration(
-            hintText: '찾을 낱말을 넣으세요',
+            hintText: hintText,
             filled: true,
             fillColor: scheme.surface,
             isDense: true,

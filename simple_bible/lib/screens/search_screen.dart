@@ -439,6 +439,11 @@ class _SearchScreenState extends State<SearchScreen>
             ? '전체'
             : '${_selectedBookNums.length}권',
         bookSelected: _selectedBookNums.isNotEmpty,
+        // The word just searched moves up into a chip and the field empties.
+        // Without a different hint that read as "nothing was searched"; this
+        // says what the empty field is for now.
+        hintText:
+            _keywords.isEmpty ? '찾을 낱말을 넣으세요' : '낱말을 더 넣어 좁혀 보세요',
         onTranslationTap: _showTranslationPicker,
         onBookTap: _allBooks.isEmpty ? null : _showBookFilterDialog,
         onSubmit: _addKeyword,
@@ -458,7 +463,10 @@ class _SearchScreenState extends State<SearchScreen>
               color: Theme.of(context).colorScheme.surfaceContainerHighest,
               padding:
                   const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-              child: SingleChildScrollView(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+              SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
                   children: [
@@ -472,7 +480,7 @@ class _SearchScreenState extends State<SearchScreen>
                             child: _operators[i - 1] == 'AND'
                                 ? Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 8, vertical: 3),
+                                        horizontal: 10, vertical: 8),
                                     decoration: BoxDecoration(
                                       color: Theme.of(context)
                                           .colorScheme
@@ -489,7 +497,7 @@ class _SearchScreenState extends State<SearchScreen>
                                     child: Text(
                                       '그리고',
                                       style: TextStyle(
-                                        fontSize: 11,
+                                        fontSize: 14,
                                         color: Theme.of(context)
                                             .colorScheme
                                             .onSurfaceVariant,
@@ -498,7 +506,7 @@ class _SearchScreenState extends State<SearchScreen>
                                   )
                                 : Container(
                                     padding: const EdgeInsets.symmetric(
-                                        horizontal: 10, vertical: 4),
+                                        horizontal: 12, vertical: 8),
                                     decoration: BoxDecoration(
                                       color: Theme.of(context)
                                           .colorScheme
@@ -509,7 +517,7 @@ class _SearchScreenState extends State<SearchScreen>
                                     child: Text(
                                       '또는',
                                       style: TextStyle(
-                                        fontSize: 13,
+                                        fontSize: 14,
                                         fontWeight: FontWeight.bold,
                                         color: Theme.of(context)
                                             .colorScheme
@@ -527,6 +535,26 @@ class _SearchScreenState extends State<SearchScreen>
                     ],
                   ],
                 ),
+              ),
+              // Words are joined with "그리고" by default, and tapping that
+              // switches to "또는". Nothing said so; the pill looked like a
+              // label. One plain line, only once there is something to join.
+              if (_keywords.length >= 2)
+                Padding(
+                  padding: const EdgeInsets.only(top: 6),
+                  child: Text(
+                    _operators.contains('OR') && _operators.contains('AND')
+                        ? "'그리고'는 둘 다, '또는'은 하나라도 (눌러서 변경)"
+                        : _operators.contains('OR')
+                            ? "하나라도 있는 구절을 찾아요 (누르면 '그리고')"
+                            : "둘 다 있는 구절만 찾아요 (누르면 '또는')",
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ),
+                ],
               ),
             ),
 
