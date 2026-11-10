@@ -449,6 +449,7 @@ class _ReaderScreenState extends State<ReaderScreen> {
                     navSeq: _navSeq,
                     highlightVerse: _highlightVerse,
                     searchKeywords: _searchKeywords,
+                    restoreVerse: widget.restoreVerse,
                     forwardLabel: _forwardLabel,
                     onForward: _goForward,
                     onStateChanged: onStateChanged,

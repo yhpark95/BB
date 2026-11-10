@@ -263,6 +263,23 @@ class DatabaseService {
     }
   }
 
+  /// A chapter in the primary translation and, when one is chosen, the
+  /// secondary — the load both readers do, in one place.
+  Future<({List<Verse> primary, List<Verse> secondary})> getChapterPair({
+    required String bookNum,
+    required int chapter,
+    required int primaryId,
+    int? secondaryId,
+  }) async {
+    final primary = await getChapter(
+        bookNum: bookNum, chapter: chapter, translationId: primaryId);
+    final secondary = secondaryId == null
+        ? <Verse>[]
+        : await getChapter(
+            bookNum: bookNum, chapter: chapter, translationId: secondaryId);
+    return (primary: primary, secondary: secondary);
+  }
+
   /// Get a specific verse by verse_uid
   Future<Verse?> getVerseByUid(int verseUid, {int translationId = 1}) async {
     final db = await database;

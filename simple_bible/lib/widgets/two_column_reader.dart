@@ -12,6 +12,9 @@ import '../models/verse.dart';
 import 'reader_gesture_layer.dart';
 import 'chapter_picker.dart';
 import 'reader_bar.dart';
+import 'verse_cell.dart';
+import 'load_error_view.dart';
+import '../utils/verse_highlight.dart';
 
 /// Minimum width before a single chapter is split across two text columns.
 /// Chosen so each column keeps a comfortable line length.
@@ -41,6 +44,10 @@ class TwoColumnReader extends StatefulWidget {
   final int? highlightVerse;
   final List<String>? searchKeywords;
 
+  /// Verse to scroll to when the app is reopened, unmarked. See
+  /// [ReaderPane.restoreVerse].
+  final int? restoreVerse;
+
   /// See [ReaderPane.forwardLabel].
   final String? forwardLabel;
   final VoidCallback? onForward;
@@ -55,6 +62,7 @@ class TwoColumnReader extends StatefulWidget {
     this.navSeq = 0,
     this.highlightVerse,
     this.searchKeywords,
+    this.restoreVerse,
     this.forwardLabel,
     this.onForward,
     this.onStateChanged,
@@ -86,9 +94,22 @@ class TwoColumnReaderState extends State<TwoColumnReader>
   @override
   int get selectionChapter => _index.isEmpty ? 1 : _index[_currentPage].chapter;
 
+  /// The chapter and verse to resume at, until the first page showing that
+  /// chapter has used it. Kept here, not read from the widget each time: the
+  /// widget's value never changes, and a later visit to the chapter must open
+  /// at the top like any other.
+  ({String bookNum, int chapter, int verse})? _pendingRestore;
+
   @override
   void initState() {
     super.initState();
+    if (widget.restoreVerse != null && widget.highlightVerse == null) {
+      _pendingRestore = (
+        bookNum: widget.bookNum,
+        chapter: widget.chapter,
+        verse: widget.restoreVerse!,
+      );
+    }
     _buildIndex();
   }
 
@@ -265,18 +286,15 @@ class TwoColumnReaderState extends State<TwoColumnReader>
     }
 
     if (_indexError != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 48, color: Colors.red),
-              const SizedBox(height: 16),
-              Text('오류: $_indexError'),
-            ],
-          ),
-        ),
+      return LoadErrorView(
+        message: '성경을 불러오지 못했어요',
+        onRetry: () {
+          setState(() {
+            _indexError = null;
+            _indexLoading = true;
+          });
+          _buildIndex();
+        },
       );
     }
 
@@ -362,6 +380,22 @@ class TwoColumnReaderState extends State<TwoColumnReader>
                     },
                     highlightVerse: isInitial ? widget.highlightVerse : null,
                     searchKeywords: isInitial ? widget.searchKeywords : null,
+                    restoreVerse: _pendingRestore != null &&
+                            _pendingRestore!.bookNum == ref.bookNum &&
+                            _pendingRestore!.chapter == ref.chapter
+                        ? _pendingRestore!.verse
+                        : null,
+                    onRestored: () => _pendingRestore = null,
+                    onTopVerse: (verse) {
+                      if (index != _currentPage) return;
+                      Provider.of<SettingsService>(context, listen: false)
+                          .saveLastPosition(
+                        bookNum: ref.bookNum,
+                        chapter: ref.chapter,
+                        verseUid: SettingsService.verseUidOf(
+                            ref.bookNum, ref.chapter, verse),
+                      );
+                    },
                   );
                 },
               ),
@@ -402,6 +436,13 @@ class _ChapterPage extends StatefulWidget {
   final int? highlightVerse;
   final List<String>? searchKeywords;
 
+  /// Resume point for this page, used once after the first load.
+  final int? restoreVerse;
+  final VoidCallback onRestored;
+
+  /// Reports the first verse visible once a scroll settles.
+  final void Function(int verse) onTopVerse;
+
   const _ChapterPage({
     super.key,
     required this.ref,
@@ -412,6 +453,9 @@ class _ChapterPage extends StatefulWidget {
     required this.onVersesLoaded,
     this.highlightVerse,
     this.searchKeywords,
+    this.restoreVerse,
+    required this.onRestored,
+    required this.onTopVerse,
   });
 
   @override
@@ -449,6 +493,30 @@ class _ChapterPageState extends State<_ChapterPage> {
   String? _error;
   final _highlightKey = GlobalKey();
 
+  /// Anchors for the primary verses, to find the one at the top of the screen
+  /// and to scroll to a resume point. One map per page, so neighbouring pages
+  /// kept alive by the PageView never share a GlobalKey.
+  final Map<int, GlobalKey> _verseKeys = {};
+
+  GlobalKey _verseKey(int verse) =>
+      _verseKeys.putIfAbsent(verse, () => GlobalKey());
+
+  int? _topVisibleVerse() {
+    final box = context.findRenderObject();
+    if (box is! RenderBox || !box.attached) return null;
+    final top = box.localToGlobal(Offset.zero).dy +
+        (Provider.of<SettingsService>(context, listen: false).isDualLanguage
+            ? 56 // the side-by-side header row sits above the scroll view
+            : 0);
+    final nums = _verseKeys.keys.toList()..sort();
+    for (final n in nums) {
+      final rb = _verseKeys[n]!.currentContext?.findRenderObject();
+      if (rb is! RenderBox || !rb.attached) continue;
+      if (rb.localToGlobal(Offset.zero).dy + rb.size.height > top) return n;
+    }
+    return null;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -478,20 +546,15 @@ class _ChapterPageState extends State<_ChapterPage> {
       final dbService = Provider.of<DatabaseService>(context, listen: false);
       final settings = Provider.of<SettingsService>(context, listen: false);
 
-      final primary = await dbService.getChapter(
+      final loaded = await dbService.getChapterPair(
         bookNum: widget.ref.bookNum,
         chapter: widget.ref.chapter,
-        translationId: settings.primaryTranslationId,
+        primaryId: settings.primaryTranslationId,
+        secondaryId:
+            settings.isDualLanguage ? settings.secondaryTranslationId : null,
       );
-
-      List<Verse> secondary = [];
-      if (settings.isDualLanguage && settings.secondaryTranslationId != null) {
-        secondary = await dbService.getChapter(
-          bookNum: widget.ref.bookNum,
-          chapter: widget.ref.chapter,
-          translationId: settings.secondaryTranslationId!,
-        );
-      }
+      final primary = loaded.primary;
+      final secondary = loaded.secondary;
 
       if (!mounted) return;
       setState(() {
@@ -501,6 +564,19 @@ class _ChapterPageState extends State<_ChapterPage> {
         _loading = false;
       });
       widget.onVersesLoaded(primary, secondary);
+
+      final restore = widget.restoreVerse;
+      if (restore != null && _arrivedAt == null) {
+        widget.onRestored();
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final ctx = _verseKeys[restore]?.currentContext;
+          if (ctx != null) {
+            Scrollable.ensureVisible(ctx,
+                alignment: 0, duration: Duration.zero);
+          }
+        });
+      }
 
       // Scroll to the marked verse, if one is still marked.
       if (_arrivedAt != null) {
@@ -544,37 +620,6 @@ class _ChapterPageState extends State<_ChapterPage> {
     return (verses.sublist(0, half), verses.sublist(half));
   }
 
-  List<InlineSpan> _buildVerseTextSpans(String text,
-      {required bool applyKeywords}) {
-    if (!applyKeywords ||
-        widget.searchKeywords == null ||
-        widget.searchKeywords!.isEmpty) {
-      return [TextSpan(text: text)];
-    }
-    final pattern = RegExp(
-      // The text has already been through joinKoreanWords, so the pattern
-      // has to tolerate a joiner between every pair of characters.
-      widget.searchKeywords!.map(keywordPatternForJoined).join('|'),
-      caseSensitive: false,
-    );
-    final spans = <InlineSpan>[];
-    int lastEnd = 0;
-    for (final match in pattern.allMatches(text)) {
-      if (match.start > lastEnd) {
-        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
-      }
-      spans.add(TextSpan(
-        text: text.substring(match.start, match.end),
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ));
-      lastEnd = match.end;
-    }
-    if (lastEnd < text.length) {
-      spans.add(TextSpan(text: text.substring(lastEnd)));
-    }
-    return spans;
-  }
-
   /// [separated] draws the gap and the rule under this verse. Off for a
   /// side-by-side column, where the row does it instead.
   Widget _buildVerseItem(SettingsService settings, Verse verse,
@@ -583,77 +628,26 @@ class _ChapterPageState extends State<_ChapterPage> {
     // anchor — a GlobalKey — can only live on one of them.
     final isArrival = _arrivedAt != null && verse.verse == _arrivedAt;
     final isSearchVerse = isArrival && isPrimary;
-    final isHighlighted =
-        widget.selectedNums.contains(verse.verse) || isArrival;
-    return Container(
-      key: isSearchVerse ? _highlightKey : null,
-      // In a single column the verse owns its gap and its rule. Side by side
-      // it must not: the two columns are as tall as their own text, so a rule
-      // drawn per cell lands at a different height in each and the page fills
-      // with stray fragments. There the row draws one rule across both.
-      padding: separated
-          ? EdgeInsets.only(bottom: settings.verseGap)
-          : EdgeInsets.zero,
-      decoration: BoxDecoration(
-        color: isHighlighted
-            ? Theme.of(context)
-                .colorScheme
-                .primaryContainer
-                .withValues(alpha: 0.4)
-            : null,
-        borderRadius: isHighlighted ? BorderRadius.circular(8) : null,
-        border: separated ? verseRuleBorder(context) : null,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: kReaderTextInset, vertical: 2),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          onLongPress: () {
-            _clearArrival();
-            widget.onVerseLongPress(verse.verse);
-          },
-          onTap: () {
-            _clearArrival();
-            widget.onVerseTap(verse.verse);
-          },
-          child: RichText(
-            textScaler:
-                MediaQuery.textScalerOf(context).clamp(maxScaleFactor: 1.5),
-            text: TextSpan(
-              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    height: settings.lineHeight,
-                    fontSize: settings.fontSize,
-                    fontWeight: settings.textWeight,
-                  ),
-              children: [
-                TextSpan(
-                  text: '${verse.verse} ',
-                  style: TextStyle(
-                    fontWeight: FontWeight.bold,
-                    color: Theme.of(context).colorScheme.primary,
-                    fontSize: settings.fontSize * 0.75,
-                  ),
-                ),
-                if (widget.bookmarkedUids.contains(verse.verseUid))
-                  WidgetSpan(
-                    alignment: PlaceholderAlignment.middle,
-                    child: Padding(
-                      padding: const EdgeInsets.only(right: 4),
-                      child: Icon(
-                        Icons.bookmark,
-                        size: settings.fontSize * 0.8,
-                        color: Theme.of(context).colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ..._buildVerseTextSpans(joinKoreanWords(verse.text),
-                    applyKeywords: isSearchVerse),
-              ],
-            ),
-          ),
-        ),
-      ),
+    return buildVerseCell(
+      context,
+      settings,
+      verse,
+      key: isSearchVerse
+          ? _highlightKey
+          : (isPrimary ? _verseKey(verse.verse) : null),
+      highlighted: widget.selectedNums.contains(verse.verse) || isArrival,
+      bookmarked: widget.bookmarkedUids.contains(verse.verseUid),
+      bodySpans: highlightSpans(joinKoreanWords(verse.text),
+          isSearchVerse ? widget.searchKeywords : null),
+      separated: separated,
+      onLongPress: () {
+        _clearArrival();
+        widget.onVerseLongPress(verse.verse);
+      },
+      onTap: () {
+        _clearArrival();
+        widget.onVerseTap(verse.verse);
+      },
     );
   }
 
@@ -672,21 +666,15 @@ class _ChapterPageState extends State<_ChapterPage> {
     if (_loading) return const Center(child: CircularProgressIndicator());
 
     if (_error != null) {
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 56, color: Colors.red),
-              const SizedBox(height: 16),
-              const Text('성경을 불러오지 못했어요',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 8),
-              Text('$_error', style: const TextStyle(fontSize: 12)),
-            ],
-          ),
-        ),
+      return LoadErrorView(
+        message: '성경을 불러오지 못했어요',
+        onRetry: () {
+          setState(() {
+            _error = null;
+            _loading = true;
+          });
+          _loadVerses();
+        },
       );
     }
 
@@ -696,7 +684,13 @@ class _ChapterPageState extends State<_ChapterPage> {
       );
     }
 
-    return Consumer<SettingsService>(
+    return NotificationListener<ScrollEndNotification>(
+      onNotification: (_) {
+        final v = _topVisibleVerse();
+        if (v != null) widget.onTopVerse(v);
+        return false;
+      },
+      child: Consumer<SettingsService>(
       builder: (context, settings, _) {
         if (settings.isDualLanguage && _secondaryVerses.isNotEmpty) {
           final pairs = pairVersesByNumber(_primaryVerses, _secondaryVerses);
@@ -812,6 +806,7 @@ class _ChapterPageState extends State<_ChapterPage> {
           },
         );
       },
+      ),
     );
   }
 }

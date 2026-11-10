@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../utils/bookmark_transfer.dart';
+import '../widgets/load_error_view.dart';
 import '../services/database_service.dart';
 import '../services/settings_service.dart';
 import '../models/verse.dart';
@@ -167,24 +168,9 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             // DatabaseException with its SQL in it means nothing to anyone
             // using this app, and looks like the phone is broken.
             debugPrint('[Bookmarks] load failed: ${snapshot.error}');
-            return Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Icon(Icons.error_outline, size: 56, color: Colors.red),
-                  const SizedBox(height: 16),
-                  const Text('북마크를 불러오지 못했어요',
-                      style:
-                          TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-                  const SizedBox(height: 16),
-                  FilledButton.icon(
-                    icon: const Icon(Icons.refresh),
-                    label: const Text('다시 시도',
-                        style: TextStyle(fontSize: 16)),
-                    onPressed: _reload,
-                  ),
-                ],
-              ),
+            return LoadErrorView(
+              message: '북마크를 불러오지 못했어요',
+              onRetry: _reload,
             );
           }
 

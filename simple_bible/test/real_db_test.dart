@@ -46,6 +46,18 @@ void main() {
       expect(v.first.verse, 1);
     });
 
+    test('getChapterPair returns both translations, or an empty secondary',
+        () async {
+      final both = await db.getChapterPair(
+          bookNum: '43', chapter: 3, primaryId: 2, secondaryId: 1);
+      expect(both.primary.length, 36);
+      expect(both.secondary.length, 36);
+      expect(both.primary.first.text, isNot(both.secondary.first.text));
+      final one = await db.getChapterPair(
+          bookNum: '43', chapter: 3, primaryId: 2);
+      expect(one.secondary, isEmpty);
+    });
+
     test('chapter counts match the canon at the edges', () async {
       final counts = await db.getChapterCounts(translationId: 2);
       expect(counts['01'], 50); // Genesis

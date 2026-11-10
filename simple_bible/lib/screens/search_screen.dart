@@ -6,6 +6,7 @@ import '../models/verse.dart';
 import '../models/book.dart';
 import '../widgets/reader_bar.dart';
 import '../utils/korean_wrap.dart';
+import '../utils/verse_highlight.dart';
 /// Complete snapshot of a search session — used to restore state exactly.
 class SearchState {
   final List<String> keywords;
@@ -356,25 +357,7 @@ class _SearchScreenState extends State<SearchScreen>
       return Text(text,
           style: baseStyle, maxLines: 3, overflow: TextOverflow.ellipsis);
     }
-    final pattern = RegExp(
-      keywords.map(keywordPatternForJoined).join('|'),
-      caseSensitive: false,
-    );
-    final spans = <TextSpan>[];
-    int lastEnd = 0;
-    for (final match in pattern.allMatches(text)) {
-      if (match.start > lastEnd) {
-        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
-      }
-      spans.add(TextSpan(
-        text: text.substring(match.start, match.end),
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ));
-      lastEnd = match.end;
-    }
-    if (lastEnd < text.length) {
-      spans.add(TextSpan(text: text.substring(lastEnd)));
-    }
+    final spans = highlightSpans(text, keywords);
     // Text.rich, not RichText: RichText ignores the inherited text style, so
     // the verse had no colour of its own and came out near-white on the light
     // card — the matched words were bold and everything else was unreadable.

@@ -12,6 +12,9 @@ import '../models/book.dart';
 import 'reader_gesture_layer.dart';
 import 'chapter_picker.dart';
 import 'reader_bar.dart';
+import 'verse_cell.dart';
+import 'load_error_view.dart';
+import '../utils/verse_highlight.dart';
 
 /// Reusable reader content — no Scaffold, no AppBar.
 class ReaderPane extends StatefulWidget {
@@ -266,20 +269,15 @@ class ReaderPaneState extends State<ReaderPane> with VerseSelectionMixin {
       final dbService = Provider.of<DatabaseService>(context, listen: false);
       final settings = Provider.of<SettingsService>(context, listen: false);
 
-      final verses = await dbService.getChapter(
+      final loaded = await dbService.getChapterPair(
         bookNum: _currentBookNum,
         chapter: _currentChapter,
-        translationId: settings.primaryTranslationId,
+        primaryId: settings.primaryTranslationId,
+        secondaryId:
+            settings.isDualLanguage ? settings.secondaryTranslationId : null,
       );
-
-      List<Verse> secondary = [];
-      if (settings.isDualLanguage && settings.secondaryTranslationId != null) {
-        secondary = await dbService.getChapter(
-          bookNum: _currentBookNum,
-          chapter: _currentChapter,
-          translationId: settings.secondaryTranslationId!,
-        );
-      }
+      final verses = loaded.primary;
+      final secondary = loaded.secondary;
 
       final books = _booksCache ??= await dbService.getAllBooks();
       final chapterCount = await dbService.getChapterCount(_currentBookNum);
@@ -442,39 +440,6 @@ class ReaderPaneState extends State<ReaderPane> with VerseSelectionMixin {
     );
   }
 
-  // Returns keyword-bolded spans for the given text. Only applied for the
-  // search-highlighted verse (isPrimary prevents duplicate keys in dual-column).
-  List<InlineSpan> _buildVerseTextSpans(String text,
-      {required bool applyKeywords}) {
-    if (!applyKeywords ||
-        widget.searchKeywords == null ||
-        widget.searchKeywords!.isEmpty) {
-      return [TextSpan(text: text)];
-    }
-    // The text has already been through joinKoreanWords, so the pattern has
-    // to tolerate a joiner between every pair of characters.
-    final pattern = RegExp(
-      widget.searchKeywords!.map(keywordPatternForJoined).join('|'),
-      caseSensitive: false,
-    );
-    final spans = <InlineSpan>[];
-    int lastEnd = 0;
-    for (final match in pattern.allMatches(text)) {
-      if (match.start > lastEnd) {
-        spans.add(TextSpan(text: text.substring(lastEnd, match.start)));
-      }
-      spans.add(TextSpan(
-        text: text.substring(match.start, match.end),
-        style: const TextStyle(fontWeight: FontWeight.bold),
-      ));
-      lastEnd = match.end;
-    }
-    if (lastEnd < text.length) {
-      spans.add(TextSpan(text: text.substring(lastEnd)));
-    }
-    return spans;
-  }
-
   /// [separated] draws the gap and the rule under this verse. Off for a
   /// side-by-side column, where the row does it instead.
   Widget _buildVerseItem(SettingsService settings, Verse verse,
@@ -486,96 +451,30 @@ class ReaderPaneState extends State<ReaderPane> with VerseSelectionMixin {
     // stays on the primary column.
     final isArrival = _arrivedAt != null && verse.verse == _arrivedAt;
     final holdsScrollAnchor = isArrival && isPrimary;
-    final isHighlighted = isArrival || isSelected(verse.verse);
 
-    return Container(
+    return buildVerseCell(
+      context,
+      settings,
+      verse,
       key: holdsScrollAnchor
           ? _highlightKey
           : (isPrimary ? _verseKey(verse.verse) : null),
-      // In a single column the verse owns its gap and its rule. Side by side
-      // it must not: the two columns are as tall as their own text, so a rule
-      // drawn per cell lands at a different height in each and the page fills
-      // with stray fragments. There the row draws one rule across both.
-      padding: separated
-          ? EdgeInsets.only(bottom: settings.verseGap)
-          : EdgeInsets.zero,
-      decoration: BoxDecoration(
-        color: isHighlighted
-            ? Theme.of(context)
-                .colorScheme
-                .primaryContainer
-                .withValues(alpha: 0.4)
-            : null,
-        borderRadius: isHighlighted ? BorderRadius.circular(8) : null,
-        border: separated ? verseRuleBorder(context) : null,
-      ),
-      child: Padding(
-        padding: const EdgeInsets.symmetric(
-            horizontal: kReaderTextInset, vertical: 2),
-        child: GestureDetector(
-          behavior: HitTestBehavior.opaque,
-          // A tap selects; a long-press extends to a range. Both retire the
-          // arrival cue first, so a verse reached from a bookmark or a search
-          // result stops looking selected the moment it is touched.
-          onLongPress: () {
-            _clearArrival();
-            longPressVerse(verse.verse);
-          },
-          onTap: () {
-            _clearArrival();
-            tapVerse(verse.verse);
-          },
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              RichText(
-                // RichText ignores the system font-size setting unless told
-                // otherwise. Honour it, capped so the in-app size on top of a
-                // large system size cannot push a verse off the screen.
-                textScaler: MediaQuery.textScalerOf(context)
-                    .clamp(maxScaleFactor: 1.5),
-                text: TextSpan(
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        // Leading is loose enough to separate lines but not so
-                        // loose that a page fits only one verse.
-                        height: settings.lineHeight,
-                        fontSize: settings.fontSize,
-                        fontWeight: settings.textWeight,
-                      ),
-                  children: [
-                    TextSpan(
-                      text: '${verse.verse} ',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: Theme.of(context).colorScheme.primary,
-                        fontSize: settings.fontSize * 0.75,
-                      ),
-                    ),
-                    // Without this a bookmarked verse looks like any other,
-                    // and the only way to check was to leave for the bookmark
-                    // list. It rides in the text so it reflows with it.
-                    if (isBookmarkedVerse(verse))
-                      WidgetSpan(
-                        alignment: PlaceholderAlignment.middle,
-                        child: Padding(
-                          padding: const EdgeInsets.only(right: 4),
-                          child: Icon(
-                            Icons.bookmark,
-                            size: settings.fontSize * 0.8,
-                            color: Theme.of(context).colorScheme.primary,
-                          ),
-                        ),
-                      ),
-                    ..._buildVerseTextSpans(joinKoreanWords(verse.text),
-                        applyKeywords: holdsScrollAnchor),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      highlighted: isArrival || isSelected(verse.verse),
+      bookmarked: isBookmarkedVerse(verse),
+      // Search terms are marked only on the verse arrived at, in one column.
+      bodySpans: highlightSpans(joinKoreanWords(verse.text),
+          holdsScrollAnchor ? widget.searchKeywords : null),
+      separated: separated,
+      // Both retire the arrival cue first, so a verse reached from a bookmark
+      // or a search result stops looking selected the moment it is touched.
+      onLongPress: () {
+        _clearArrival();
+        longPressVerse(verse.verse);
+      },
+      onTap: () {
+        _clearArrival();
+        tapVerse(verse.verse);
+      },
     );
   }
 
@@ -699,32 +598,16 @@ class ReaderPaneState extends State<ReaderPane> with VerseSelectionMixin {
       // to act on "DatabaseException(no such table: verses) sql=..." — it just
       // reads as the phone being broken.
       debugPrint('[RP] showing load failure: $_error');
-      return Center(
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              const Icon(Icons.error_outline, size: 56, color: Colors.red),
-              const SizedBox(height: 16),
-              const Text('성경을 불러오지 못했어요',
-                  style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold)),
-              const SizedBox(height: 16),
-              FilledButton.icon(
-                icon: const Icon(Icons.refresh),
-                label: const Text('다시 시도', style: TextStyle(fontSize: 16)),
-                onPressed: () {
-                  setState(() {
-                    _error = null;
-                    _loading = true;
-                  });
-                  _beginLoading();
-                  _loadData();
-                },
-              ),
-            ],
-          ),
-        ),
+      return LoadErrorView(
+        message: '성경을 불러오지 못했어요',
+        onRetry: () {
+          setState(() {
+            _error = null;
+            _loading = true;
+          });
+          _beginLoading();
+          _loadData();
+        },
       );
     }
 
