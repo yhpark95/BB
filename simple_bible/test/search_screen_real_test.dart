@@ -110,6 +110,47 @@ void main() {
     expect(find.text('찾지 못했어요'), findsNothing);
   });
 
+  testWidgets('with Korean and English on, a Latin word searches English at once',
+      (tester) async {
+    await settings.setSingleTranslation(2);
+    await settings.toggleTranslation(1); // Korean + English
+    await pumpSearch(tester);
+    await search(tester, 'love');
+    expect(find.text('찾지 못했어요'), findsNothing);
+    expect(find.textContaining('개 찾았어요'), findsOneWidget);
+    expect(find.widgetWithText(OutlinedButton, '영어'), findsOneWidget);
+    await settings.setSingleTranslation(2);
+  });
+
+  testWidgets('a Hangul word switches back to Korean, unless the reader chose',
+      (tester) async {
+    await settings.setSingleTranslation(2);
+    await settings.toggleTranslation(1);
+    await pumpSearch(tester);
+    await search(tester, 'love'); // auto: English
+    await tester.tap(find.descendant(
+        of: find.byType(InputChip), matching: find.byType(Icon)));
+    await tester.pump();
+    await search(tester, '사랑'); // auto: back to Korean
+    expect(find.widgetWithText(OutlinedButton, '한국어'), findsOneWidget);
+    await settings.setSingleTranslation(2);
+  });
+
+  testWidgets('a language the reader picked is not overridden', (tester) async {
+    await settings.setSingleTranslation(2);
+    await settings.toggleTranslation(1);
+    await pumpSearch(tester);
+    await tester.tap(find.widgetWithText(OutlinedButton, '한국어'));
+    await tester.pumpAndSettle();
+    await tester.tap(find.text('한국어').last); // choose Korean on purpose
+    await tester.pumpAndSettle();
+    await search(tester, 'love');
+    // Stays Korean, so nothing is found and the offer appears.
+    expect(find.text('찾지 못했어요'), findsOneWidget);
+    expect(find.text('영어로 찾아보기'), findsOneWidget);
+    await settings.setSingleTranslation(2);
+  });
+
   testWidgets('a nonsense word gives the empty state, no language offer for '
       'a matching language', (tester) async {
     await settings.setSingleTranslation(2);

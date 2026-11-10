@@ -158,7 +158,9 @@ class SettingsScreen extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Text(
-                          '인터넷 없이도 읽을 수 있고,\n모든 기록은 이 휴대폰에만 저장됩니다.',
+                          '인터넷 없이도 읽을 수 있어요.\n'
+                          '읽던 곳과 북마크는 이 휴대폰에 저장돼요.\n'
+                          "휴대폰을 바꿀 땐 북마크 화면의 '옮기기'를 쓰세요.",
                           textAlign: TextAlign.center,
                           style: TextStyle(
                             fontSize: 14,

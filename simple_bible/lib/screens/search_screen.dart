@@ -56,6 +56,12 @@ class _SearchScreenState extends State<SearchScreen>
   int _searchTranslationId = 2; // independent per-search language
   bool _translationInitialized = false;
 
+  /// Once the reader has chosen a language themselves — the chip, or the
+  /// offer under "찾지 못했어요" — the app stops choosing for them.
+  bool _userPickedLanguage = false;
+
+  static final RegExp _latinWord = RegExp(r'^[A-Za-zÀ-ÿ\s\-]+$');
+
   late TabController _filterTabController;
 
   @override
@@ -69,6 +75,7 @@ class _SearchScreenState extends State<SearchScreen>
       _operators = List.from(s.operators);
       _selectedBookNums = Set.from(s.selectedBookNums);
       _searchTranslationId = s.translationId;
+      _userPickedLanguage = true; // restoring: keep exactly what was searched
       _results = List.from(s.results);
       _hasSearched = true;
     }
@@ -114,6 +121,7 @@ class _SearchScreenState extends State<SearchScreen>
       if (_keywords.isNotEmpty) _operators.add('AND');
       _keywords.add(text);
       _inputController.clear();
+      _autoPickLanguage();
     });
     _performSearch();
   }
@@ -125,6 +133,7 @@ class _SearchScreenState extends State<SearchScreen>
         final opIndex = index == 0 ? 0 : index - 1;
         if (opIndex < _operators.length) _operators.removeAt(opIndex);
       }
+      _autoPickLanguage();
     });
     if (_keywords.isEmpty) {
       setState(() {
@@ -193,15 +202,35 @@ class _SearchScreenState extends State<SearchScreen>
     if (_keywords.every(DatabaseService.isHangulOnly)) {
       return _searchTranslationId == 2 ? null : 2;
     }
-    final latin = RegExp(r'^[A-Za-zÀ-ÿ\s\-]+$');
-    if (_keywords.every(latin.hasMatch) && _searchTranslationId == 2) {
+    if (_keywords.every(_latinWord.hasMatch) && _searchTranslationId == 2) {
       // English is the likelier intent for a bare Latin word.
       return 1;
     }
     return null;
   }
 
+  /// Picks the language the words are written in, from the translations the
+  /// reader has switched on, so a word does not first fail in the wrong one.
+  /// Hangul searches Korean. Latin letters search English or French — whichever
+  /// is on, English first. Anything else, or nothing suitable on, is left as it
+  /// is, and "찾지 못했어요" still offers the switch.
+  void _autoPickLanguage() {
+    if (_userPickedLanguage || _keywords.isEmpty) return;
+    if (_keywords.every(DatabaseService.isHangulOnly)) {
+      _searchTranslationId = 2;
+    } else if (_keywords.every(_latinWord.hasMatch)) {
+      final on = Provider.of<SettingsService>(context, listen: false)
+          .selectedTranslationIds;
+      if (on.contains(1)) {
+        _searchTranslationId = 1;
+      } else if (on.contains(3)) {
+        _searchTranslationId = 3;
+      }
+    }
+  }
+
   void _setSearchTranslation(int id) {
+    _userPickedLanguage = true;
     if (_searchTranslationId == id) return;
     setState(() => _searchTranslationId = id);
     if (_keywords.isNotEmpty) _performSearch();

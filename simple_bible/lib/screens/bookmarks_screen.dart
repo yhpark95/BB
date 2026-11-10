@@ -9,6 +9,14 @@ import '../models/verse.dart';
 import '../models/book.dart';
 import '../utils/korean_wrap.dart';
 
+/// What one load of the list needs: the saved verses in the primary
+/// translation, and — when two are on — the same verses in the second.
+class _BookmarkRows {
+  final List<Verse> primary;
+  final Map<int, Verse> secondary;
+  const _BookmarkRows(this.primary, this.secondary);
+}
+
 class BookmarksScreen extends StatefulWidget {
   /// Called with the verse to open. Always supplied by the reader — bookmarks
   /// never push a second reader on top of the one already running.
@@ -23,7 +31,7 @@ class BookmarksScreen extends StatefulWidget {
 
 class _BookmarksScreenState extends State<BookmarksScreen> {
   Map<String, Book> _booksCache = {};
-  Future<List<Verse>>? _bookmarksFuture;
+  Future<_BookmarkRows>? _bookmarksFuture;
 
   @override
   void initState() {
@@ -37,11 +45,21 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     _bookmarksFuture ??= _fetchBookmarks();
   }
 
-  Future<List<Verse>> _fetchBookmarks() {
+  Future<_BookmarkRows> _fetchBookmarks() async {
     final dbService = Provider.of<DatabaseService>(context, listen: false);
-    final translationId =
-        Provider.of<SettingsService>(context, listen: false).translationId;
-    return dbService.getBookmarks(translationId: translationId);
+    final settings = Provider.of<SettingsService>(context, listen: false);
+    final primary =
+        await dbService.getBookmarks(translationId: settings.primaryTranslationId);
+    final secondaryId =
+        settings.isDualLanguage ? settings.secondaryTranslationId : null;
+    final secondary = secondaryId == null
+        ? <int, Verse>{}
+        : {
+            for (final v
+                in await dbService.getBookmarks(translationId: secondaryId))
+              v.verseUid: v,
+          };
+    return _BookmarkRows(primary, secondary);
   }
 
   void _reload() {
@@ -69,6 +87,47 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
     final settings = Provider.of<SettingsService>(context, listen: false);
     final name = book.nameFor(settings.primaryTranslationId);
     return '$name ${verse.chapter}장 ${verse.verse}절';
+  }
+
+  void _showTransferSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      useSafeArea: true,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              leading: const Icon(Icons.copy_all, size: 28),
+              title: const Text('북마크 복사하기',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+              subtitle: const Text(
+                  '글로 복사해서 메모나 카톡에 보관해요'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _export();
+              },
+            ),
+            ListTile(
+              contentPadding:
+                  const EdgeInsets.symmetric(horizontal: 20, vertical: 6),
+              leading: const Icon(Icons.content_paste, size: 28),
+              title: const Text('복사한 북마크 가져오기',
+                  style: TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
+              subtitle: const Text('복사해 둔 북마크를 이 휴대폰에 붙여 넣어요'),
+              onTap: () {
+                Navigator.pop(ctx);
+                _import();
+              },
+            ),
+            const SizedBox(height: 8),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _export() async {
@@ -146,17 +205,17 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
         centerTitle: true,
         actions: [
-          PopupMenuButton<String>(
-            tooltip: '북마크 옮기기',
-            onSelected: (v) => v == 'export' ? _export() : _import(),
-            itemBuilder: (_) => const [
-              PopupMenuItem(value: 'export', child: Text('북마크 복사하기')),
-              PopupMenuItem(value: 'import', child: Text('복사한 북마크 가져오기')),
-            ],
+          // A word, not a three-dot icon: nobody guesses what is behind it.
+          TextButton.icon(
+            icon: const Icon(Icons.swap_horiz),
+            label: const Text('옮기기', style: TextStyle(fontSize: 16)),
+            style: TextButton.styleFrom(minimumSize: const Size(0, 48)),
+            onPressed: _showTransferSheet,
           ),
+          const SizedBox(width: 4),
         ],
       ),
-      body: FutureBuilder<List<Verse>>(
+      body: FutureBuilder<_BookmarkRows>(
         future: _bookmarksFuture,
         builder: (context, snapshot) {
           if (snapshot.connectionState == ConnectionState.waiting) {
@@ -174,7 +233,8 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
             );
           }
 
-          final bookmarks = snapshot.data ?? [];
+          final rows = snapshot.data;
+          final bookmarks = rows?.primary ?? const <Verse>[];
 
           if (bookmarks.isEmpty) {
             return Center(
@@ -271,6 +331,27 @@ class _BookmarksScreenState extends State<BookmarksScreen> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
+                            // The second translation, when two are on, so the
+                            // list shows what the reader sees.
+                            if (rows?.secondary[verse.verseUid] != null) ...[
+                              const SizedBox(height: 8),
+                              Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Text(
+                                  joinKoreanWords(
+                                      rows!.secondary[verse.verseUid]!.text),
+                                  style: TextStyle(
+                                    fontSize: 15,
+                                    height: 1.5,
+                                    color: Theme.of(context)
+                                        .colorScheme
+                                        .onSurfaceVariant,
+                                  ),
+                                  maxLines: 3,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ),
+                            ],
                           ],
                         ),
                       ),

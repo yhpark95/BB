@@ -438,13 +438,15 @@ Widget readerBottomBar(
                 padding:
                     const EdgeInsets.symmetric(horizontal: 4, vertical: 8),
                 alignment: Alignment.center,
+                // "2 / 5장": chapter 2 of 5. Bare "2/5" read as a
+                // page count to anyone who had not been told. Before that it was
                 // "2 / 5" rather than a big "2장" over a tiny "전체 5장".
                 // The old second line was 11sp — unreadable in an app people
                 // use because 11sp is unreadable to them — and it repeated the
                 // number above it. One line says both, at a size that can be
                 // read, and needs no hiding at large font scales.
                 child: shrinkLabel(
-                  '$chapter/$chapterCount',
+                  '$chapter/$chapterCount장',
                   style: Theme.of(context).textTheme.titleMedium?.copyWith(
                         fontWeight: FontWeight.bold,
                         color: scheme.primary,
@@ -897,6 +899,44 @@ String _currentTranslationSummary(BuildContext context) {
       .join(' + ');
 }
 
+/// John 3:16–18 in the translation being read, for the size and spacing
+/// previews. They used to be Korean whatever the reader was reading, which
+/// showed a size the reader would never see their own text at.
+List<(String, String)> previewVerses(int translationId) {
+  switch (translationId) {
+    case 1:
+      return const [
+        ('16', 'For God so loved the world, that he gave his only begotten Son,'),
+        ('17', 'For God sent not his Son into the world to condemn the world;'),
+        ('18', 'He that believeth on him is not condemned:'),
+      ];
+    case 3:
+      return const [
+        ('16', "Car Dieu a tant aimé le monde qu'il a donné son Fils unique,"),
+        ('17', "Dieu, en effet, n'a pas envoyé son Fils dans le monde"),
+        ('18', "Celui qui croit en lui n'est point jugé;"),
+      ];
+    default:
+      return const [
+        ('16', '하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니'),
+        ('17', '하나님이 그 아들을 세상에 보내신 것은'),
+        ('18', '그를 믿는 자는 심판을 받지 아니하는 것이요'),
+      ];
+  }
+}
+
+/// One short line of the same verse, for judging the size at a glance.
+String previewHeadline(int translationId) {
+  switch (translationId) {
+    case 1:
+      return 'For God so loved the world,';
+    case 3:
+      return 'Car Dieu a tant aimé le monde,';
+    default:
+      return '하나님이 세상을 이처럼 사랑하사';
+  }
+}
+
 /// Big − A + stepper. Easier to hit than a slider.
 class FontSizeStepper extends StatelessWidget {
   const FontSizeStepper({super.key});
@@ -948,13 +988,32 @@ class FontSizeStepper extends StatelessWidget {
                 color: Theme.of(context).colorScheme.surfaceContainerHighest,
                 borderRadius: BorderRadius.circular(12),
               ),
-              child: Text(
-                '하나님이 세상을 이처럼 사랑하사',
-                style: TextStyle(
-                  fontSize: settings.fontSize,
-                  fontWeight: settings.textWeight,
-                  height: 1.6,
-                ),
+              child: Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      // Only the opening words: enough to judge the size.
+                      previewHeadline(settings.primaryTranslationId),
+                      style: TextStyle(
+                        fontSize: settings.fontSize,
+                        fontWeight: settings.textWeight,
+                        height: 1.6,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 8),
+                  // The size itself, so "how big is it now" has an answer other
+                  // than comparing the sample with the page.
+                  Text(
+                    '${settings.fontSize.round()}',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Theme.of(context).colorScheme.primary,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
@@ -1072,11 +1131,8 @@ class SpacingSteppers extends StatelessWidget {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  for (final line in const [
-                    ('16', '하나님이 세상을 이처럼 사랑하사 독생자를 주셨으니'),
-                    ('17', '하나님이 그 아들을 세상에 보내신 것은'),
-                    ('18', '그를 믿는 자는 심판을 받지 아니하는 것이요'),
-                  ])
+                  for (final line
+                      in previewVerses(settings.primaryTranslationId))
                     Padding(
                       padding: EdgeInsets.only(bottom: settings.verseGap),
                       child: RichText(

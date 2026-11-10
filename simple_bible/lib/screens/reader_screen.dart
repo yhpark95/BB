@@ -417,6 +417,22 @@ class _ReaderScreenState extends State<ReaderScreen> {
           canPop: false,
           onPopInvokedWithResult: (didPop, _) {
             if (didPop) return;
+            // Back first drops a selection: it is the screen's top layer, and
+            // leaving it up while Back walked the history or offered to quit
+            // would act on something the reader cannot see.
+            if (isWide) {
+              final wide = _wideKey.currentState;
+              if (wide != null && wide.hasSelection) {
+                wide.clearSelection();
+                return;
+              }
+            } else {
+              final pane = _paneKey.currentState;
+              if (pane != null && pane.hasSelection) {
+                pane.clearSelection();
+                return;
+              }
+            }
             if (_goBack()) return;
             if (widget.isRoot) {
               _confirmExit(context);

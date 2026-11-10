@@ -247,7 +247,8 @@ void main() {
 
       final text = clipboard.single.arguments['text'] as String;
       expect(text, '요한복음 3:2 - 2절 본문\n\n요한복음 3:7 - 7절 본문');
-      expect(s.hasSelection, isFalse);
+      // Kept, so the same verses can be bookmarked straight after copying.
+      expect(s.hasSelection, isTrue);
     });
 
     testWidgets('a dual-language copy carries both translations',

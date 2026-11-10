@@ -41,7 +41,7 @@ void main() {
     expect(find.text('다음 장'), findsOneWidget);
     // One line carries both numbers: the old second line was 11sp and simply
     // repeated the chapter above it.
-    expect(find.text('3/21'), findsOneWidget);
+    expect(find.text('3/21장'), findsOneWidget);
   });
 
   testWidgets('bottom bar navigation buttons are at least 48dp tall',

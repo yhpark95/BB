@@ -206,7 +206,8 @@ mixin VerseSelectionMixin<T extends StatefulWidget> on State<T> {
 
     await Clipboard.setData(ClipboardData(text: buffer.toString().trim()));
     if (!mounted) return;
-    setState(resetSelectionState);
+    // The selection stays: copying is often followed by bookmarking the same
+    // verses, and re-selecting them was the cost of copying first.
     showSelectionMessage('구절을 복사했어요');
   }
 
