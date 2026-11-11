@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/settings_service.dart';
 import '../app_version.dart';
+import '../widgets/donation_sheet.dart';
 import '../widgets/reader_bar.dart';
 
 /// Settings kept deliberately short: text size, text weight, screen theme.
@@ -128,6 +129,17 @@ class SettingsScreen extends StatelessWidget {
                 title: Text('실려 있는 번역본', style: TextStyle(fontSize: 16)),
                 subtitle: Text(
                     '개역한글 (한국어) · KJV (영어) · Louis Segond 1910 (프랑스어)'),
+              ),
+
+              ListTile(
+                contentPadding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                leading: const Icon(Icons.favorite_border, size: 26),
+                title: const Text('개발자 후원하기',
+                    style: TextStyle(fontSize: 16)),
+                subtitle: const Text('마음이 있을 때만, 안 해도 괜찮아요'),
+                trailing: const Icon(Icons.chevron_right),
+                onTap: () => showDonationSheet(context),
               ),
 
               Padding(
