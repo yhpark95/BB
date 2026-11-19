@@ -18,18 +18,32 @@
 
   <meta charset="UTF-8">
   <meta content="IE=Edge" http-equiv="X-UA-Compatible">
-  <meta name="description" content="A new Flutter project.">
+  <meta name="description" content="광고 없고 로그인 없는 오프라인 성경">
 
   <!-- iOS meta tags & icons -->
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-status-bar-style" content="black">
-  <meta name="apple-mobile-web-app-title" content="simple_bible">
-  <link rel="apple-touch-icon" href="icons/Icon-192.png">
+  <meta name="apple-mobile-web-app-title" content="성경">
+  <link rel="apple-touch-icon" href="icons/Icon-maskable-192.png">
 
   <!-- Favicon -->
   <link rel="icon" type="image/png" href="favicon.png"/>
 
-  <title>simple_bible</title>
+  <title>성경</title>
+  <meta name="theme-color" content="#3D7BE0">
+  <script>
+    // Chrome fires this once, early, often before Flutter has started. Keep it
+    // so the app can offer "install" when it is ready, and tell it when done.
+    window.addEventListener('beforeinstallprompt', function (e) {
+      e.preventDefault();
+      window.__installPrompt = e;
+      window.dispatchEvent(new Event('install-changed'));
+    });
+    window.addEventListener('appinstalled', function () {
+      window.__installPrompt = null;
+      window.dispatchEvent(new Event('install-changed'));
+    });
+  </script>
   <link rel="manifest" href="manifest.json">
 </head>
 <body>

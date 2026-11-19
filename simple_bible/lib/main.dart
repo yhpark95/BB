@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import 'screens/reader_screen.dart';
 import 'services/database_service.dart';
 import 'services/settings_service.dart';
+import 'widgets/install_banner.dart';
 import 'widgets/update_banner.dart';
 import 'services/web_db_init_stub.dart'
     if (dart.library.js_interop) 'services/web_db_init_web.dart';
@@ -78,6 +79,7 @@ class SimpleBibleApp extends StatelessWidget {
             themeMode: settings.themeMode,
             builder: (context, child) => Column(children: [
               const UpdateBanner(),
+              const InstallBanner(),
               Expanded(child: child ?? const SizedBox.shrink()),
             ]),
             // The reader IS the app. There is no separate home screen to

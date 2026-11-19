@@ -1,12 +1,12 @@
 {
-    "name": "simple_bible",
-    "short_name": "simple_bible",
+    "name": "성경",
+    "short_name": "성경",
     "start_url": ".",
     "display": "standalone",
-    "background_color": "#0175C2",
-    "theme_color": "#0175C2",
-    "description": "A new Flutter project.",
-    "orientation": "portrait-primary",
+    "background_color": "#F9F9FF",
+    "theme_color": "#3D7BE0",
+    "description": "광고 없고 로그인 없는 오프라인 성경",
+    "orientation": "any",
     "prefer_related_applications": false,
     "icons": [
         {
@@ -31,5 +31,6 @@
             "type": "image/png",
             "purpose": "maskable"
         }
-    ]
+    ],
+    "lang": "ko"
 }
