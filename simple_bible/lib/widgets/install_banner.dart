@@ -21,14 +21,30 @@ bool shouldOfferInstall(InstallSource s, {required bool dismissed}) {
   }
 }
 
-const _dismissedKey = 'install_hint_dismissed';
+/// The bar is offered on this many visits at most, then stops by itself. A
+/// reader who ignored it three times has made their choice; the settings
+/// screen still has the entry for later.
+const int kMaxInstallHints = 3;
 
-Future<bool> _loadDismissed() async {
+const _dismissedKey = 'install_hint_dismissed';
+const _showsKey = 'install_hint_shows';
+
+class InstallHintState {
+  final bool dismissed;
+  final int shows;
+  const InstallHintState({this.dismissed = false, this.shows = 0});
+
+  bool get exhausted => dismissed || shows >= kMaxInstallHints;
+}
+
+Future<InstallHintState> _loadState() async {
   try {
-    return (await SharedPreferences.getInstance()).getBool(_dismissedKey) ??
-        false;
+    final p = await SharedPreferences.getInstance();
+    return InstallHintState(
+        dismissed: p.getBool(_dismissedKey) ?? false,
+        shows: p.getInt(_showsKey) ?? 0);
   } catch (_) {
-    return false;
+    return const InstallHintState();
   }
 }
 
@@ -38,19 +54,27 @@ Future<void> _saveDismissed() async {
   } catch (_) {}
 }
 
+Future<void> _saveShows(int n) async {
+  try {
+    await (await SharedPreferences.getInstance()).setInt(_showsKey, n);
+  } catch (_) {}
+}
+
 /// A thin bar saying how to put the site on the home screen like an app.
 class InstallBanner extends StatefulWidget {
   const InstallBanner({
     super.key,
     this.source,
-    this.loadDismissed = _loadDismissed,
+    this.loadState = _loadState,
     this.saveDismissed = _saveDismissed,
+    this.saveShows = _saveShows,
   });
 
   /// Defaults to the browser's. Tests pass a fake.
   final InstallSource? source;
-  final Future<bool> Function() loadDismissed;
+  final Future<InstallHintState> Function() loadState;
   final Future<void> Function() saveDismissed;
+  final Future<void> Function(int) saveShows;
 
   @override
   State<InstallBanner> createState() => _InstallBannerState();
@@ -60,6 +84,8 @@ class _InstallBannerState extends State<InstallBanner> {
   late final InstallSource _source = widget.source ?? createInstallSource();
   StreamSubscription<void>? _sub;
   bool _dismissed = true; // hidden until the saved choice is known
+  int _shows = 0;
+  bool _counted = false; // this visit has been counted once
   bool _showSteps = false;
 
   @override
@@ -68,8 +94,12 @@ class _InstallBannerState extends State<InstallBanner> {
     _sub = _source.changes.listen((_) {
       if (mounted) setState(() {});
     });
-    widget.loadDismissed().then((d) {
-      if (mounted) setState(() => _dismissed = d);
+    widget.loadState().then((st) {
+      if (!mounted) return;
+      setState(() {
+        _dismissed = st.exhausted;
+        _shows = st.shows;
+      });
     });
   }
 
@@ -100,6 +130,11 @@ class _InstallBannerState extends State<InstallBanner> {
     if (!shouldOfferInstall(_source, dismissed: _dismissed)) {
       return const SizedBox.shrink();
     }
+    if (!_counted) {
+      // Counted when it is actually put in front of the reader, once a visit.
+      _counted = true;
+      widget.saveShows(_shows + 1);
+    }
     final scheme = Theme.of(context).colorScheme;
     final android = _source.platform == InstallPlatform.android;
     return Material(
@@ -129,21 +164,22 @@ class _InstallBannerState extends State<InstallBanner> {
               ),
             ]),
           ),
-          if (_showSteps && !android) const _IosSteps(),
+          if (_showSteps && !android)
+            IosInstallSteps(color: scheme.onSecondaryContainer),
         ]),
       ),
     );
   }
 }
 
-class _IosSteps extends StatelessWidget {
-  const _IosSteps();
+/// The iPhone steps. Used in the bar and in the settings dialog.
+class IosInstallSteps extends StatelessWidget {
+  final Color color;
+  const IosInstallSteps({super.key, required this.color});
 
   @override
   Widget build(BuildContext context) {
-    final scheme = Theme.of(context).colorScheme;
-    final step = TextStyle(
-        fontSize: 15, height: 1.5, color: scheme.onSecondaryContainer);
+    final step = TextStyle(fontSize: 15, height: 1.5, color: color);
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 0, 16, 12),
       child: Align(

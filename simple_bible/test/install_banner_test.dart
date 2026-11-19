@@ -67,14 +67,19 @@ void main() {
   });
 
   Future<void> pump(WidgetTester t, _Fake s,
-      {bool dismissed = false, void Function()? onSave}) {
+      {bool dismissed = false,
+      int shows = 0,
+      void Function()? onSave,
+      void Function(int)? onShows}) {
     return t.pumpWidget(MaterialApp(
       home: Scaffold(
         body: Column(children: [
           InstallBanner(
             source: s,
-            loadDismissed: () async => dismissed,
+            loadState: () async =>
+                InstallHintState(dismissed: dismissed, shows: shows),
             saveDismissed: () async => onSave?.call(),
+            saveShows: (n) async => onShows?.call(n),
           ),
           const Expanded(child: SizedBox()),
         ]),
@@ -150,5 +155,30 @@ void main() {
     await t.pump();
     expect(t.takeException(), isNull);
     expect(find.text('방법'), findsOneWidget);
+  });
+
+  testWidgets('stops by itself after three visits', (t) async {
+    await pump(t, _Fake(InstallPlatform.ios), shows: 2);
+    await t.pump();
+    expect(find.textContaining('홈 화면에 추가하면'), findsOneWidget); // the 3rd
+
+    await t.pumpWidget(const SizedBox()); // a new visit starts from nothing
+    await pump(t, _Fake(InstallPlatform.ios), shows: kMaxInstallHints);
+    await t.pump();
+    expect(find.textContaining('홈 화면에 추가하면'), findsNothing);
+  });
+
+  testWidgets('a visit is counted once, only when it was shown', (t) async {
+    final counts = <int>[];
+    final s = _Fake(InstallPlatform.android); // Chrome has not offered yet
+    await pump(t, s, shows: 1, onShows: counts.add);
+    await t.pump();
+    expect(counts, isEmpty);
+    s.canPrompt = true;
+    s.change();
+    await t.pump();
+    await t.pump();
+    await t.pump();
+    expect(counts, [2]);
   });
 }

@@ -4,6 +4,7 @@ import 'package:provider/provider.dart';
 import '../services/settings_service.dart';
 import '../app_version.dart';
 import '../widgets/donation_sheet.dart';
+import '../widgets/install_tile.dart';
 import '../widgets/reader_bar.dart';
 
 /// Settings kept deliberately short: text size, text weight, screen theme.
@@ -131,6 +132,8 @@ class SettingsScreen extends StatelessWidget {
                 subtitle:
                     Text('개역한글 (한국어) · KJV (영어) · Louis Segond 1910 (프랑스어)'),
               ),
+
+              const InstallTile(),
 
               // Play billing does not exist in a browser.
               if (!kIsWeb)
