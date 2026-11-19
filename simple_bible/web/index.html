@@ -30,7 +30,14 @@
   <link rel="icon" type="image/png" href="favicon.png"/>
 
   <title>성경</title>
-  <meta name="theme-color" content="#3D7BE0">
+  <meta name="theme-color" content="#F9F9FF">
+  <script>
+    // Until the app starts and sets the exact colour, match the system theme
+    // rather than flashing the manifest's blue.
+    if (window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches) {
+      document.querySelector('meta[name="theme-color"]').setAttribute('content', '#111418');
+    }
+  </script>
   <script>
     // Chrome fires this once, early, often before Flutter has started. Keep it
     // so the app can offer "install" when it is ready, and tell it when done.
