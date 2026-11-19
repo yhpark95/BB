@@ -4,6 +4,8 @@ import 'package:provider/provider.dart';
 import 'screens/reader_screen.dart';
 import 'services/database_service.dart';
 import 'services/settings_service.dart';
+import 'services/web_db_init_stub.dart'
+    if (dart.library.js_interop) 'services/web_db_init_web.dart';
 
 /// Opened on a first run, before any reading position exists: John 3.
 const String kDefaultBookNum = '43';
@@ -17,6 +19,8 @@ void main() {
       debugPrint('[SimpleBible] FlutterError: ${details.exceptionAsString()}');
       debugPrint('[SimpleBible] ${details.stack}');
     };
+
+    initWebDatabaseFactory();
 
     final settingsService = SettingsService();
     await settingsService.initialize();

@@ -63,6 +63,7 @@ class DatabaseService {
 
   /// Initialize database from assets
   Future<Database> _initDatabase() async {
+    if (kIsWeb) return _initWebDatabase();
     try {
       debugPrint('[DB] Initializing database...');
       final databasesPath = await getDatabasesPath();
@@ -114,6 +115,30 @@ class DatabaseService {
       debugPrint('[DB] Failed to initialize database: $e\n$stack');
       rethrow;
     }
+  }
+
+  /// Size in bytes of `assets/bible.db`. On the web the installed copy is
+  /// stamped with it (as `PRAGMA user_version`) so a start can tell, without
+  /// downloading the 34MB asset, whether the stored Bible is the current one.
+  /// A test fails when the asset changes and this does not.
+  static const int webBibleStamp = 34275328;
+
+  /// The browser has no files: SQLite keeps its databases in IndexedDB. The
+  /// Bible is downloaded and stored once, then opened locally from then on.
+  Future<Database> _initWebDatabase() async {
+    final path = join(await getDatabasesPath(), 'bible.db');
+    if (await databaseFactory.databaseExists(path)) {
+      final stored = await openDatabase(path);
+      final v = Sqflite.firstIntValue(await stored.rawQuery('PRAGMA user_version'));
+      if (v == webBibleStamp) return stored;
+      await stored.close();
+    }
+    final data = await rootBundle.load('assets/bible.db');
+    await databaseFactory.writeDatabaseBytes(
+        path, data.buffer.asUint8List(data.offsetInBytes, data.lengthInBytes));
+    final db = await openDatabase(path);
+    await db.execute('PRAGMA user_version = $webBibleStamp');
+    return db;
   }
 
   static int _headerUserVersion(Uint8List bytes) {

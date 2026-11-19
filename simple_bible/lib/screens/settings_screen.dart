@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../services/settings_service.dart';
@@ -38,8 +39,8 @@ class SettingsScreen extends StatelessWidget {
                   value: settings.boldText,
                   onChanged: settings.setBoldText,
                   title: const Text('글자를 굵게',
-                      style: TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w600)),
+                      style:
+                          TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                   subtitle: const Text('글자가 흐릿하게 보일 때 켜세요'),
                 ),
               ),
@@ -102,8 +103,8 @@ class SettingsScreen extends StatelessWidget {
                       const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
                   leading: const Icon(Icons.translate, size: 28),
                   title: const Text('읽을 번역본 고르기',
-                      style: TextStyle(
-                          fontSize: 17, fontWeight: FontWeight.w600)),
+                      style:
+                          TextStyle(fontSize: 17, fontWeight: FontWeight.w600)),
                   subtitle: Text(_translationSummary(settings)),
                   trailing: const Icon(Icons.chevron_right),
                   onTap: () => showTranslationSheet(context),
@@ -127,20 +128,21 @@ class SettingsScreen extends StatelessWidget {
                     EdgeInsets.symmetric(horizontal: 20, vertical: 4),
                 leading: Icon(Icons.book, size: 26),
                 title: Text('실려 있는 번역본', style: TextStyle(fontSize: 16)),
-                subtitle: Text(
-                    '개역한글 (한국어) · KJV (영어) · Louis Segond 1910 (프랑스어)'),
+                subtitle:
+                    Text('개역한글 (한국어) · KJV (영어) · Louis Segond 1910 (프랑스어)'),
               ),
 
-              ListTile(
-                contentPadding:
-                    const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
-                leading: const Icon(Icons.favorite_border, size: 26),
-                title: const Text('개발자 후원하기',
-                    style: TextStyle(fontSize: 16)),
-                subtitle: const Text('마음이 있을 때만, 안 해도 괜찮아요'),
-                trailing: const Icon(Icons.chevron_right),
-                onTap: () => showDonationSheet(context),
-              ),
+              // Play billing does not exist in a browser.
+              if (!kIsWeb)
+                ListTile(
+                  contentPadding:
+                      const EdgeInsets.symmetric(horizontal: 20, vertical: 4),
+                  leading: const Icon(Icons.favorite_border, size: 26),
+                  title: const Text('개발자 후원하기', style: TextStyle(fontSize: 16)),
+                  subtitle: const Text('마음이 있을 때만, 안 해도 괜찮아요'),
+                  trailing: const Icon(Icons.chevron_right),
+                  onTap: () => showDonationSheet(context),
+                ),
 
               Padding(
                 padding: const EdgeInsets.all(20),
