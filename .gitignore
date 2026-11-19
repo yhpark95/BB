@@ -12,3 +12,4 @@ simple_bible_snapshot_*/
 *.jks
 *.keystore
 *.backup
+.firebase/
